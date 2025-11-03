@@ -13,11 +13,16 @@ document.addEventListener('DOMContentLoaded', function() {
 // Initialize application
 function initializeApp() {
     loadEmployees();
-    loadAttendanceData();
+    loadAttendanceDataFromStorage();
     setupEventListeners();
     updateSummaryStats();
     renderEmployeeList();
     setTodayDate();
+    updateAdvancedStats();
+    populatePositionFilter();
+    populateReportEmployeeSelect();
+    setupEditEmployeeForm();
+    loadAttendanceData();
 }
 
 // Update current time
@@ -55,10 +60,17 @@ function setupEventListeners() {
     });
 
     // Modal close on outside click
-    const modal = document.getElementById('add-employee-modal');
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
+    const addModal = document.getElementById('add-employee-modal');
+    addModal.addEventListener('click', function(e) {
+        if (e.target === addModal) {
             closeAddEmployeeModal();
+        }
+    });
+    
+    const editModal = document.getElementById('edit-employee-modal');
+    editModal.addEventListener('click', function(e) {
+        if (e.target === editModal) {
+            closeEditEmployeeModal();
         }
     });
 }
@@ -137,6 +149,7 @@ function checkIn() {
 
     saveAttendanceData();
     updateSummaryStats();
+    updateAdvancedStats();
     loadAttendanceData();
     
     const status = isLate ? 'متأخر' : 'في الوقت المحدد';
@@ -177,6 +190,7 @@ function checkOut() {
 
     saveAttendanceData();
     updateSummaryStats();
+    updateAdvancedStats();
     loadAttendanceData();
     
     showNotification('تم تسجيل الانصراف بنجاح', 'success');
@@ -226,6 +240,8 @@ function addNewEmployee() {
     employees.push(newEmployee);
     saveEmployees();
     renderEmployeeList();
+    populatePositionFilter();
+    populateReportEmployeeSelect();
     updateSummaryStats();
     
     showNotification('تم إضافة الموظف بنجاح', 'success');
@@ -246,11 +262,21 @@ function closeAddEmployeeModal() {
 }
 
 // Render employee list
-function renderEmployeeList() {
+let filteredEmployees = [];
+
+function renderEmployeeList(employeesToRender = null) {
     const employeeList = document.getElementById('employee-list');
     employeeList.innerHTML = '';
 
-    employees.forEach(employee => {
+    const employeesToShow = employeesToRender || employees;
+    filteredEmployees = employeesToShow;
+
+    if (employeesToShow.length === 0) {
+        employeeList.innerHTML = '<p class="no-results">لا توجد نتائج</p>';
+        return;
+    }
+
+    employeesToShow.forEach(employee => {
         const employeeItem = document.createElement('div');
         employeeItem.className = 'employee-item';
         employeeItem.innerHTML = `
@@ -263,14 +289,55 @@ function renderEmployeeList() {
                 <p><strong>الراتب:</strong> ${employee.salary} ريال</p>
                 <p><strong>وقت العمل:</strong> ${employee.workStartTime} - ${employee.workEndTime}</p>
             </div>
+            <div class="employee-actions">
+                <button class="edit-btn" onclick="showEditEmployeeModal('${employee.id}')">
+                    <i class="fas fa-edit"></i> تعديل
+                </button>
+                <button class="delete-btn" onclick="deleteEmployee('${employee.id}')">
+                    <i class="fas fa-trash"></i> حذف
+                </button>
+            </div>
         `;
         employeeList.appendChild(employeeItem);
+    });
+}
+
+// Filter employees
+function filterEmployees() {
+    const searchTerm = document.getElementById('employee-search').value.toLowerCase();
+    const positionFilter = document.getElementById('position-filter').value;
+
+    let filtered = employees.filter(employee => {
+        const matchesSearch = !searchTerm || 
+            employee.name.toLowerCase().includes(searchTerm) || 
+            employee.id.includes(searchTerm);
+        const matchesPosition = !positionFilter || employee.position === positionFilter;
+        return matchesSearch && matchesPosition;
+    });
+
+    renderEmployeeList(filtered);
+}
+
+// Populate position filter
+function populatePositionFilter() {
+    const positionFilter = document.getElementById('position-filter');
+    // Clear existing options except "جميع المناصب"
+    positionFilter.innerHTML = '<option value="">جميع المناصب</option>';
+    
+    const positions = [...new Set(employees.map(emp => emp.position))];
+    
+    positions.forEach(position => {
+        const option = document.createElement('option');
+        option.value = position;
+        option.textContent = position;
+        positionFilter.appendChild(option);
     });
 }
 
 // Load attendance data for selected date
 function loadAttendanceData() {
     const selectedDate = document.getElementById('attendance-date').value;
+    const statusFilter = document.getElementById('status-filter').value;
     const tbody = document.getElementById('attendance-tbody');
     tbody.innerHTML = '';
 
@@ -311,15 +378,25 @@ function loadAttendanceData() {
             }
         }
 
-        row.innerHTML = `
-            <td>${employee.id}</td>
-            <td>${employee.name}</td>
-            <td>${checkInTime}</td>
-            <td>${checkOutTime}</td>
-            <td>${workHours}</td>
-            <td class="${statusClass}">${status}</td>
-        `;
-        tbody.appendChild(row);
+        // Apply status filter
+        let shouldShow = true;
+        if (statusFilter) {
+            if (statusFilter === 'present' && status !== 'حاضر') shouldShow = false;
+            if (statusFilter === 'absent' && status !== 'غائب') shouldShow = false;
+            if (statusFilter === 'late' && status !== 'متأخر') shouldShow = false;
+        }
+
+        if (shouldShow) {
+            row.innerHTML = `
+                <td>${employee.id}</td>
+                <td>${employee.name}</td>
+                <td>${checkInTime}</td>
+                <td>${checkOutTime}</td>
+                <td>${workHours}</td>
+                <td class="${statusClass}">${status}</td>
+            `;
+            tbody.appendChild(row);
+        }
     });
 }
 
@@ -352,6 +429,9 @@ function updateSummaryStats() {
     document.getElementById('present-employees').textContent = presentCount;
     document.getElementById('absent-employees').textContent = absentCount;
     document.getElementById('late-employees').textContent = lateCount;
+    
+    // Update advanced stats
+    updateAdvancedStats();
 }
 
 // Export attendance data
@@ -622,9 +702,367 @@ function saveAttendanceData() {
     localStorage.setItem('attendance_data', JSON.stringify(attendanceData));
 }
 
-function loadAttendanceData() {
+function loadAttendanceDataFromStorage() {
     const saved = localStorage.getItem('attendance_data');
     if (saved) {
         attendanceData = JSON.parse(saved);
     }
+}
+
+// Edit Employee Functions
+function showEditEmployeeModal(employeeId) {
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) return;
+
+    document.getElementById('edit-employee-id').value = employee.id;
+    document.getElementById('edit-employee-name').value = employee.name;
+    document.getElementById('edit-employee-position').value = employee.position;
+    document.getElementById('edit-employee-salary').value = employee.salary;
+    document.getElementById('edit-work-start-time').value = employee.workStartTime;
+    document.getElementById('edit-work-end-time').value = employee.workEndTime;
+
+    document.getElementById('edit-employee-modal').classList.add('active');
+}
+
+function closeEditEmployeeModal() {
+    document.getElementById('edit-employee-modal').classList.remove('active');
+    document.getElementById('edit-employee-form').reset();
+}
+
+function setupEditEmployeeForm() {
+    const editForm = document.getElementById('edit-employee-form');
+    editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        updateEmployee();
+    });
+}
+
+function updateEmployee() {
+    const employeeId = document.getElementById('edit-employee-id').value;
+    const employee = employees.find(emp => emp.id === employeeId);
+    
+    if (!employee) {
+        showNotification('الموظف غير موجود', 'error');
+        return;
+    }
+
+    employee.name = document.getElementById('edit-employee-name').value.trim();
+    employee.position = document.getElementById('edit-employee-position').value.trim();
+    employee.salary = parseFloat(document.getElementById('edit-employee-salary').value);
+    employee.workStartTime = document.getElementById('edit-work-start-time').value;
+    employee.workEndTime = document.getElementById('edit-work-end-time').value;
+
+    saveEmployees();
+    renderEmployeeList();
+    populatePositionFilter();
+    populateReportEmployeeSelect();
+    closeEditEmployeeModal();
+    showNotification('تم تحديث بيانات الموظف بنجاح', 'success');
+}
+
+function deleteEmployee(employeeId) {
+    if (!confirm('هل أنت متأكد من حذف هذا الموظف؟')) {
+        return;
+    }
+
+    employees = employees.filter(emp => emp.id !== employeeId);
+    saveEmployees();
+    renderEmployeeList();
+    populatePositionFilter();
+    populateReportEmployeeSelect();
+    updateSummaryStats();
+    showNotification('تم حذف الموظف بنجاح', 'success');
+}
+
+// Advanced Statistics
+function updateAdvancedStats() {
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+    
+    // Calculate average work hours
+    let totalHours = 0;
+    let daysWithHours = 0;
+    
+    Object.keys(attendanceData).forEach(date => {
+        const [year, month] = date.split('-').map(Number);
+        if (year === currentYear && month === currentMonth) {
+            Object.values(attendanceData[date]).forEach(attendance => {
+                if (attendance.checkIn && attendance.checkOut) {
+                    const checkIn = new Date(`2000-01-01 ${attendance.checkIn}`);
+                    const checkOut = new Date(`2000-01-01 ${attendance.checkOut}`);
+                    const hours = (checkOut - checkIn) / (1000 * 60 * 60);
+                    totalHours += hours;
+                    daysWithHours++;
+                }
+            });
+        }
+    });
+    
+    const avgHours = daysWithHours > 0 ? (totalHours / daysWithHours).toFixed(2) : 0;
+    document.getElementById('avg-work-hours').textContent = avgHours + ' ساعة';
+    
+    // Calculate attendance rate
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const workingDays = employees.length * daysInMonth;
+    let presentDays = 0;
+    
+    Object.keys(attendanceData).forEach(date => {
+        const [year, month] = date.split('-').map(Number);
+        if (year === currentYear && month === currentMonth) {
+            Object.values(attendanceData[date]).forEach(attendance => {
+                if (attendance.checkIn) presentDays++;
+            });
+        }
+    });
+    
+    const attendanceRate = workingDays > 0 ? ((presentDays / workingDays) * 100).toFixed(1) : 0;
+    document.getElementById('attendance-rate').textContent = attendanceRate + '%';
+    
+    // Find top employee
+    const employeeStats = {};
+    employees.forEach(emp => {
+        employeeStats[emp.id] = { name: emp.name, count: 0 };
+    });
+    
+    Object.keys(attendanceData).forEach(date => {
+        const [year, month] = date.split('-').map(Number);
+        if (year === currentYear && month === currentMonth) {
+            Object.keys(attendanceData[date]).forEach(empId => {
+                if (attendanceData[date][empId].checkIn && employeeStats[empId]) {
+                    employeeStats[empId].count++;
+                }
+            });
+        }
+    });
+    
+    const topEmployee = Object.values(employeeStats).reduce((max, emp) => 
+        emp.count > max.count ? emp : max, { name: '-', count: 0 });
+    document.getElementById('top-employee').textContent = topEmployee.name;
+    
+    // Calculate average late days
+    let totalLateDays = 0;
+    let employeesWithLate = 0;
+    
+    employees.forEach(emp => {
+        let lateCount = 0;
+        Object.keys(attendanceData).forEach(date => {
+            const [year, month] = date.split('-').map(Number);
+            if (year === currentYear && month === currentMonth) {
+                const attendance = attendanceData[date][emp.id];
+                if (attendance && attendance.isLate) {
+                    lateCount++;
+                }
+            }
+        });
+        if (lateCount > 0) {
+            totalLateDays += lateCount;
+            employeesWithLate++;
+        }
+    });
+    
+    const avgLate = employeesWithLate > 0 ? (totalLateDays / employeesWithLate).toFixed(1) : 0;
+    document.getElementById('avg-late').textContent = avgLate + ' يوم';
+}
+
+// Employee Performance Reports
+function populateReportEmployeeSelect() {
+    const select = document.getElementById('report-employee');
+    select.innerHTML = '<option value="">اختر موظف</option>';
+    
+    employees.forEach(employee => {
+        const option = document.createElement('option');
+        option.value = employee.id;
+        option.textContent = `${employee.name} (${employee.id})`;
+        select.appendChild(option);
+    });
+}
+
+function generateEmployeeReport() {
+    const employeeId = document.getElementById('report-employee').value;
+    const selectedMonth = document.getElementById('report-month').value;
+    
+    if (!employeeId || !selectedMonth) {
+        document.getElementById('employee-report-content').innerHTML = 
+            '<p class="no-report">يرجى اختيار موظف وتاريخ لعرض التقرير</p>';
+        return;
+    }
+    
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) return;
+    
+    const [year, month] = selectedMonth.split('-');
+    const salaryData = calculateEmployeeSalary(employee, year, month);
+    
+    // Get detailed attendance
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const attendanceDetails = [];
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = `${year}-${month.padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+        const attendance = attendanceData[date] ? attendanceData[date][employee.id] : null;
+        
+        if (attendance && attendance.checkIn) {
+            let workHours = '-';
+            if (attendance.checkOut) {
+                const checkIn = new Date(`2000-01-01 ${attendance.checkIn}`);
+                const checkOut = new Date(`2000-01-01 ${attendance.checkOut}`);
+                const hours = (checkOut - checkIn) / (1000 * 60 * 60);
+                workHours = hours.toFixed(2) + ' ساعة';
+            }
+            
+            attendanceDetails.push({
+                date: date,
+                checkIn: attendance.checkIn,
+                checkOut: attendance.checkOut || '-',
+                workHours: workHours,
+                isLate: attendance.isLate
+            });
+        }
+    }
+    
+    const reportHTML = `
+        <div class="employee-report">
+            <h3>تقرير أداء الموظف: ${employee.name}</h3>
+            <div class="report-summary">
+                <div class="summary-row">
+                    <span>المنصب:</span>
+                    <span>${employee.position}</span>
+                </div>
+                <div class="summary-row">
+                    <span>الراتب الأساسي:</span>
+                    <span>${salaryData.baseSalary.toFixed(2)} ريال</span>
+                </div>
+                <div class="summary-row">
+                    <span>أيام الحضور:</span>
+                    <span>${salaryData.presentDays} يوم</span>
+                </div>
+                <div class="summary-row">
+                    <span>أيام الغياب:</span>
+                    <span>${salaryData.absentDays} يوم</span>
+                </div>
+                <div class="summary-row">
+                    <span>أيام التأخير:</span>
+                    <span>${salaryData.lateDays} يوم</span>
+                </div>
+                <div class="summary-row">
+                    <span>إجمالي ساعات العمل:</span>
+                    <span>${salaryData.totalHours.toFixed(2)} ساعة</span>
+                </div>
+                <div class="summary-row">
+                    <span>الخصومات:</span>
+                    <span>${salaryData.deductions.toFixed(2)} ريال</span>
+                </div>
+                <div class="summary-row highlight">
+                    <span>الراتب النهائي:</span>
+                    <span>${salaryData.finalSalary.toFixed(2)} ريال</span>
+                </div>
+            </div>
+            <h4>تفاصيل الحضور:</h4>
+            <div class="attendance-details">
+                ${attendanceDetails.length > 0 ? 
+                    attendanceDetails.map(att => `
+                        <div class="detail-item">
+                            <span>${att.date}</span>
+                            <span>${att.checkIn} - ${att.checkOut}</span>
+                            <span>${att.workHours}</span>
+                            <span class="${att.isLate ? 'status-late' : 'status-present'}">${att.isLate ? 'متأخر' : 'في الوقت'}</span>
+                        </div>
+                    `).join('') : 
+                    '<p>لا توجد بيانات حضور لهذا الشهر</p>'
+                }
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('employee-report-content').innerHTML = reportHTML;
+}
+
+function exportEmployeeReport() {
+    const employeeId = document.getElementById('report-employee').value;
+    const selectedMonth = document.getElementById('report-month').value;
+    
+    if (!employeeId || !selectedMonth) {
+        showNotification('يرجى اختيار موظف وتاريخ أولاً', 'error');
+        return;
+    }
+    
+    generateEmployeeReport();
+    const reportContent = document.getElementById('employee-report-content').innerText;
+    
+    // Create a simple text report (PDF would require a library)
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `employee_report_${employeeId}_${selectedMonth}.txt`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showNotification('تم تصدير التقرير بنجاح', 'success');
+}
+
+// Backup and Restore Functions
+function backupData() {
+    const backup = {
+        employees: employees,
+        attendanceData: attendanceData,
+        backupDate: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `attendance_backup_${new Date().toISOString().split('T')[0]}.json`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showNotification('تم تصدير النسخة الاحتياطية بنجاح', 'success');
+}
+
+function restoreData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!confirm('تحذير: سيتم استبدال جميع البيانات الحالية. هل أنت متأكد؟')) {
+        event.target.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const backup = JSON.parse(e.target.result);
+            
+            if (backup.employees && backup.attendanceData) {
+                employees = backup.employees;
+                attendanceData = backup.attendanceData;
+                
+                saveEmployees();
+                saveAttendanceData();
+                
+                renderEmployeeList();
+                populatePositionFilter();
+                populateReportEmployeeSelect();
+                updateSummaryStats();
+                updateAdvancedStats();
+                loadAttendanceDataFromStorage();
+                loadAttendanceData();
+                
+                showNotification('تم استعادة البيانات بنجاح', 'success');
+            } else {
+                showNotification('ملف النسخة الاحتياطية غير صحيح', 'error');
+            }
+        } catch (error) {
+            showNotification('خطأ في قراءة ملف النسخة الاحتياطية', 'error');
+        }
+    };
+    
+    reader.readAsText(file);
+    event.target.value = '';
 }

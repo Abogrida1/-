@@ -106,6 +106,17 @@
                             إضافة موظف جديد
                         </button>
                     </div>
+                    <div class="search-filter-bar">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="employee-search" placeholder="ابحث عن موظف بالاسم أو الرقم..." oninput="filterEmployees()">
+                        </div>
+                        <div class="filter-options">
+                            <select id="position-filter" onchange="filterEmployees()">
+                                <option value="">جميع المناصب</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="employee-list" id="employee-list">
                         <!-- Employee list will be populated here -->
                     </div>
@@ -120,6 +131,14 @@
                         <div class="date-picker">
                             <label for="attendance-date">اختر التاريخ:</label>
                             <input type="date" id="attendance-date" onchange="loadAttendanceData()">
+                        </div>
+                        <div class="filter-group">
+                            <select id="status-filter" onchange="loadAttendanceData()">
+                                <option value="">جميع الحالات</option>
+                                <option value="present">حاضر</option>
+                                <option value="absent">غائب</option>
+                                <option value="late">متأخر</option>
+                            </select>
                         </div>
                         <button class="export-btn" onclick="exportAttendance()">
                             <i class="fas fa-download"></i>
@@ -142,6 +161,81 @@
                                 <!-- Attendance data will be populated here -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Advanced Statistics Section -->
+            <section class="stats-section">
+                <div class="stats-card">
+                    <h2>إحصائيات متقدمة</h2>
+                    <div class="advanced-stats">
+                        <div class="stat-box">
+                            <i class="fas fa-chart-line"></i>
+                            <div class="stat-content">
+                                <span class="stat-title">متوسط ساعات العمل اليومية</span>
+                                <span class="stat-value" id="avg-work-hours">0 ساعة</span>
+                            </div>
+                        </div>
+                        <div class="stat-box">
+                            <i class="fas fa-calendar-check"></i>
+                            <div class="stat-content">
+                                <span class="stat-title">نسبة الحضور الشهرية</span>
+                                <span class="stat-value" id="attendance-rate">0%</span>
+                            </div>
+                        </div>
+                        <div class="stat-box">
+                            <i class="fas fa-user-clock"></i>
+                            <div class="stat-content">
+                                <span class="stat-title">أكثر موظف حضوراً</span>
+                                <span class="stat-value" id="top-employee">-</span>
+                            </div>
+                        </div>
+                        <div class="stat-box">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <div class="stat-content">
+                                <span class="stat-title">متوسط التأخير</span>
+                                <span class="stat-value" id="avg-late">0 يوم</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Employee Performance Reports -->
+            <section class="reports-section">
+                <div class="reports-card">
+                    <h2>تقارير أداء الموظفين</h2>
+                    <div class="reports-controls">
+                        <select id="report-employee" onchange="generateEmployeeReport()">
+                            <option value="">اختر موظف</option>
+                        </select>
+                        <input type="month" id="report-month" onchange="generateEmployeeReport()">
+                        <button class="export-btn" onclick="exportEmployeeReport()">
+                            <i class="fas fa-file-pdf"></i>
+                            تصدير تقرير PDF
+                        </button>
+                    </div>
+                    <div id="employee-report-content" class="report-content">
+                        <p class="no-report">يرجى اختيار موظف وتاريخ لعرض التقرير</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Backup and Restore Section -->
+            <section class="backup-section">
+                <div class="backup-card">
+                    <h2>نسخ احتياطي واستعادة البيانات</h2>
+                    <div class="backup-controls">
+                        <button class="backup-btn" onclick="backupData()">
+                            <i class="fas fa-download"></i>
+                            تصدير نسخة احتياطية
+                        </button>
+                        <label for="restore-file" class="restore-btn">
+                            <i class="fas fa-upload"></i>
+                            استعادة من نسخة احتياطية
+                            <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreData(event)">
+                        </label>
                     </div>
                 </div>
             </section>
@@ -207,7 +301,7 @@
     <div class="modal" id="add-employee-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>إضافة موظف جديد</h3>
+                <h3 id="modal-title">إضافة موظف جديد</h3>
                 <button class="close-btn" onclick="closeAddEmployeeModal()">
                     <i class="fas fa-times"></i>
                 </button>
@@ -240,7 +334,48 @@
                     </div>
                     <div class="form-actions">
                         <button type="button" class="cancel-btn" onclick="closeAddEmployeeModal()">إلغاء</button>
-                        <button type="submit" class="save-btn">حفظ الموظف</button>
+                        <button type="submit" class="save-btn" id="save-employee-btn">حفظ الموظف</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Employee Modal -->
+    <div class="modal" id="edit-employee-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>تعديل بيانات الموظف</h3>
+                <button class="close-btn" onclick="closeEditEmployeeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-employee-form">
+                    <input type="hidden" id="edit-employee-id">
+                    <div class="form-group">
+                        <label for="edit-employee-name">اسم الموظف:</label>
+                        <input type="text" id="edit-employee-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-employee-position">المنصب:</label>
+                        <input type="text" id="edit-employee-position" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-employee-salary">الراتب الشهري:</label>
+                        <input type="number" id="edit-employee-salary" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-work-start-time">وقت بدء العمل:</label>
+                        <input type="time" id="edit-work-start-time" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-work-end-time">وقت انتهاء العمل:</label>
+                        <input type="time" id="edit-work-end-time" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn" onclick="closeEditEmployeeModal()">إلغاء</button>
+                        <button type="submit" class="save-btn">حفظ التعديلات</button>
                     </div>
                 </form>
             </div>

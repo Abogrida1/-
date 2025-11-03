@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إنشاء حساب جديد</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../auth-styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1>إنشاء حساب جديد</h1>
+                <p>انضم إلينا اليوم</p>
+            </div>
+            
+            <!-- Progress Steps -->
+            <div class="steps-indicator" id="steps-indicator">
+                <div class="step active" data-step="1">
+                    <div class="step-number">1</div>
+                    <span>المعلومات الأساسية</span>
+                </div>
+                <div class="step" data-step="2">
+                    <div class="step-number">2</div>
+                    <span>تفاصيل الحساب</span>
+                </div>
+                <div class="step" data-step="3">
+                    <div class="step-number">3</div>
+                    <span>التحقق</span>
+                </div>
+            </div>
+            
+            <!-- Step 1: Basic Information -->
+            <form id="register-form" class="auth-form" data-step="1">
+                <div class="form-group">
+                    <label for="full-name">الاسم الكامل</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="full-name" name="fullName" placeholder="أدخل اسمك الكامل" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-email">البريد الإلكتروني</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="register-email" name="email" placeholder="أدخل بريدك الإلكتروني" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">رقم الهاتف</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-phone"></i>
+                        <input type="tel" id="phone" name="phone" placeholder="05xxxxxxxx" required>
+                    </div>
+                </div>
+                
+                <div class="form-buttons">
+                    <button type="button" class="auth-btn secondary-btn" onclick="window.location.href='login.html'">
+                        <i class="fas fa-arrow-right"></i>
+                        <span>إلغاء</span>
+                    </button>
+                    <button type="button" class="auth-btn primary-btn" onclick="goToStep(2)">
+                        <span>التالي</span>
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Step 2: Account Details -->
+            <form id="register-form-step2" class="auth-form hidden" data-step="2">
+                <div class="form-group">
+                    <label for="register-password">كلمة المرور</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="register-password" name="password" placeholder="أدخل كلمة المرور" required minlength="8">
+                        <button type="button" class="password-toggle" onclick="togglePassword('register-password')">
+                            <i class="fas fa-eye" id="register-password-eye"></i>
+                        </button>
+                    </div>
+                    <small class="form-hint">يجب أن تكون كلمة المرور 8 أحرف على الأقل</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm-password">تأكيد كلمة المرور</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="confirm-password" name="confirmPassword" placeholder="أعد إدخال كلمة المرور" required>
+                        <button type="button" class="password-toggle" onclick="togglePassword('confirm-password')">
+                            <i class="fas fa-eye" id="confirm-password-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="terms" required>
+                        <span>أوافق على <a href="#" target="_blank">الشروط والأحكام</a> و <a href="#" target="_blank">سياسة الخصوصية</a></span>
+                    </label>
+                </div>
+                
+                <div class="form-buttons">
+                    <button type="button" class="auth-btn secondary-btn" onclick="goToStep(1)">
+                        <i class="fas fa-arrow-right"></i>
+                        <span>السابق</span>
+                    </button>
+                    <button type="button" class="auth-btn primary-btn" onclick="goToStep(3)">
+                        <span>التالي</span>
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Step 3: Verification -->
+            <div id="register-form-step3" class="auth-form hidden" data-step="3">
+                <div class="verification-section">
+                    <i class="fas fa-envelope-circle-check"></i>
+                    <h3>تحقق من بريدك الإلكتروني</h3>
+                    <p>لقد أرسلنا رابط التحقق إلى بريدك الإلكتروني</p>
+                    <div class="form-group">
+                        <label for="verification-code">رمز التحقق</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-key"></i>
+                            <input type="text" id="verification-code" name="verificationCode" placeholder="أدخل رمز التحقق" maxlength="6">
+                        </div>
+                    </div>
+                    <button type="button" class="auth-btn secondary-btn" onclick="resendCode()">
+                        <i class="fas fa-redo"></i>
+                        <span>إعادة إرسال الرمز</span>
+                    </button>
+                </div>
+                
+                <div class="form-buttons">
+                    <button type="button" class="auth-btn secondary-btn" onclick="goToStep(2)">
+                        <i class="fas fa-arrow-right"></i>
+                        <span>السابق</span>
+                    </button>
+                    <button type="button" class="auth-btn primary-btn" onclick="verifyAndRegister()">
+                        <span>إنشاء الحساب</span>
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="auth-footer">
+                <p>لديك حساب بالفعل؟ <a href="/auth/login.html">سجل الدخول</a></p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification-container"></div>
+    
+    <script src="../auth-script.js"></script>
+</body>
+</html>
